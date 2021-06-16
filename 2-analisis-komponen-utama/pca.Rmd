@@ -1,0 +1,124 @@
+---
+title: "Analisis Komponen Utama"
+author: "Tim Modul 60"
+date: "6/16/2021"
+output: html_document
+---
+
+
+```{r message=FALSE, warning=FALSE}
+library(factoextra)
+library(psych)
+```
+
+Lakukan PCA pada data `USArrests`.
+
+# Manual
+
+## Menyiapkan Data
+
+```{r}
+data("USArrests")
+knitr::kable(head(USArrests, 10))
+```
+
+Hal pertama yang baik untuk dilakukan adalah melakukan scaling pada data. Hal ini dilakukan ketika variabel memiliki maginitude yang berbeda. Pada dataset diatas terlihat bahwa variabel `Murder` memiliki besaran yang berbeda dengan `Assult`. Hal ini juga dapat dilihat dari varians setiap variabelnya yang sangat berbeda jauh
+
+```{r}
+apply(USArrests, 2, var)
+```
+
+```{r}
+scale_df <- apply(USArrests, 2, scale)
+knitr::kable(head(scale_df, 10))
+```
+
+Hal yang perlu diingat bahwa ada kondisi dimana scaling variabel tidak diperlukan yaitu ketika setiap variabel memiliki unit yang sama atau analis berharap dapat menangkap perbedaan varians tersebut pada hasil analisisnya nanti. 
+
+Analisis PCA ini sangat dipengaruhi oleh magnitude dari setiap variabel, sehingga hasil yang diperoleh akan berbeda ketika variabel dilakukan scaling atau tidak.
+
+## Cari Nilai dan Vector Eigen
+
+```{r}
+eig <- eigen(cov(scale_df))
+eig.val <- eig$values
+eig.vec <- eig$vectors
+eig
+```
+
+Eigen Vector akan digunakan untuk membentuk loadings dan eigen values akan digunakan untuk menghitung kontribusi variance yang disumbangkan oleh principle component yang dibentuk
+
+## Importance of Component
+
+```{r}
+stdev <- sqrt(eig.val)
+tot.var <- sum(eig.val)
+prop.var <- eig.val/tot.var
+cum.var <- cumsum(prop.var)
+t(data.frame("Standard Deviation" = stdev,
+     "Proportion of Variance" = prop.var,
+     "Cumulative Proportion" = cum.var))
+```
+
+Terlihat bahwa principle component (PC) pertama menyumbangkan 62% keragaman data, PC kedua sebesar 25% keragaman data, PC ketiga sebesar 9% dan PC keempat sebesar 4%. Dengan hanya mengambil dua PC pertama maka kita sudah mengambil 87% dari keragaman data.
+
+Jadi berapa jumlah PC yang baik untuk diambil? **Kembali terserah anda**. Jika anda berpegang tegauh bahwa PC yang diambil hanya yang nulai standard deviationnya lebih dari 1 maka hanya 1 PC yang memenuhi. Tapi jika saya dalam kondisi seperti ini saya akan tetap mengambil 2 PC karena jika dilihat jika hanya mengambil 1 maka kita masih kehilangan 38% dari keragaman data dan jika dilihat juga PC kedua nilai standard deviasinya sangat mendekati 1.
+
+
+Untuk membantu menentukan jumlah PC juga dapat menggunakan scree plot
+
+```{r}
+scree(scale_df)
+```
+
+## Loadings
+
+```{r}
+loadings <- data.frame(eig.vec)
+rownames(loadings) <- colnames(USArrests)
+loadings
+```
+
+Nilai loading ini untuk melihat sumbangan keragaman data setiap variabel ke setiap principle component. Terlihat bahwa principle component pertama banyak disumbangkan oleh variabel `Murder`, `Assult`, dan `Rape` sedangkan pada principle component kedua disumbangkan oleh variabel `UrbanPop`
+
+## Scores
+```{r}
+scores <- as.data.frame(scale_df %*% eig.vec)
+scores <- cbind(State = row.names(USArrests), scores)
+knitr::kable(head(scores, 10))
+```
+
+Nilai scores inilah yang akan digunakan untuk analisis lebih lanjut. Jika dilihat korelasi antara nilai score tiap principle component sudah sangat kecil, sangat mendekati nol. Sehingga teknik ini cocok digunakan untuk menghilangkan efek multikolinritas sebelum melakukan analisis regresi
+
+```{r}
+cor(scores[-1])
+```
+
+# Fungsi Bawaan R
+
+Interpertasi sama dengan analisis yang diatas. Disini akan digunakan fungsi `princomp` bawaan R
+
+## Membuat Principle Component
+```{r}
+pca <- princomp(scale_df)
+summary(pca, loadings = FALSE)
+```
+
+## Screeplot
+```{r}
+screeplot(pca, type="line")
+```
+
+```{r message=FALSE, warning=FALSE}
+fviz_eig(pca)
+```
+
+## Loadings
+```{r}
+pca$loadings
+```
+
+## Scores
+```{r}
+knitr::kable(head(pca$scores, 10))
+```
