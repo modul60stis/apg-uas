@@ -1,0 +1,135 @@
+---
+title: "Korelasi Kanonik"
+author: "Tim Modul 60"
+date: "6/17/2021"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE}
+#install.packages("CCA")
+#install.packages("CCP")
+library(ggplot2)
+library(GGally)
+library(CCA)
+library(CCP)
+```
+
+Seorang peneliti mengumpulkan data 3 variabel psikologi, 4 variabel akademik (standardized test scores) dan gender dari 600 mahasiswa. Peneliti tertarik untuk melihat hubungan antara variabel psikologi dengan akademik dan gender. Peneliti tertarik untuk mengetahui berapa banyak dimensi (variabel kanonik) yang dibutuhkan untuk memahami dua set variabel tersebut.
+
+# Import Data
+```{r}
+mm <- read.csv("mmreg.csv")
+knitr::kable(head(mm, 10))
+```
+
+# Eksplore Data
+
+## Summary
+
+```{r}
+summary(mm)
+```
+
+3 variabel psikologi adalah `locus_of_control`, `self_concept`, dan `motivation`. Sementara itu variabel akaedmik `read`, `write`, `math`, dan `science`
+
+```{r}
+table(mm$female)
+```
+
+Terdapat sebanyak 327 mahasiswa perempuan
+
+## Korelasi
+```{r}
+psikologi <- mm[, 1:3]
+akademik <- mm[, 4:8]
+
+ggpairs(psikologi)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+ggpairs(akademik)
+```
+
+```{r}
+matcor(psikologi, akademik)
+```
+
+# Korelasi Kanonik
+
+**Nilai yang diperoleh di R ini berbeda tanda dengan yang di SPSS. Saya tidak tau kenapa**
+
+## Korelasi
+```{r}
+cc1 <- cc(psikologi, akademik)
+cc1$cor
+```
+
+Hasil tersebut adalah korelasi perdimensi, terlihat bahwa dimensi pertama memiliki korelasi yang paling tinggi
+
+## Uji Signifikansi
+```{r}
+rho <- cc1$cor
+
+n <- nrow(mm) # jumlah observasi
+p <- length(psikologi) # jumlah variabel psikologi
+q <- length(akademik) # jumlah variabel akademik
+```
+
+### Uji Wilks Lambda
+```{r}
+p.asym(rho, n, p, q, tstat = "Wilks")
+```
+
+### Uji Hotelling
+```{r}
+p.asym(rho, n, p, q, tstat = "Hotelling")
+```
+
+### Uji Pillai
+```{r}
+p.asym(rho, n, p, q, tstat = "Pillai")
+```
+
+### Uji Roy
+```{r}
+p.asym(rho, n, p, q, tstat = "Roy")
+```
+
+Dengan tingkat signifikansi 5%, terlihat bahwa dari 4 uji, dimensi ke 3 tidak signifikan sebanyak 3 kali sehingga dapat kita hilangkan dari analisis
+
+## Koefisien Korelasi
+```{r}
+cc1[3:4]
+```
+
+Koefisien kanonikan masing masing dimensi (unstandardized) pada kelompok variable. Misal untuk dimensi pertama pada kelompok psikologi
+
+$z_1$ = -1.25383 locus_of + 0.35135 self_con -1.26242 motimation
+
+Interpertasi koefisien ini bisa dianalogikan seperti menginterpertasikan koefisien di regresi. Sebagai contoh untuk variabel `read`, ketika satu unit dari `read` naik maka akan menyebabkan nilai pada variabel canonical pertama turun sebesar 0.0446 dengan asumsi variabel lainnya konstan.
+
+## Loadings
+
+Untuk melihat kontribusi setiap variabel pada variabel kanonik. Ini bisa disamakan dengan loadings di analisis factor
+
+```{r}
+cc2 <- comput(psikologi, akademik, cc1)
+cc2[c(3, 6)]
+```
+
+Misalnya untuk dimensi psikologi, terlihat bahwa `llocus_of` dan `motivate` paling tinggi berkorelasi dengan dimensi 1 dan `self_con` paling tinggi dengan dimensi 2 ( ingat dimensi 3 sudah direduksi
+
+## Standardized Coefficients
+
+```{r}
+s1 <- diag(sqrt(diag(cov(psikologi))))
+s1 %*% cc1$xcoef
+```
+
+```{r}
+s2 <- diag(sqrt(diag(cov(akademik))))
+s2 %*% cc1$ycoef
+```
+
+Koefisien standardize ini akan berguna ketika variabel pada model memilki standard deviasi yang sangat berbeda.
