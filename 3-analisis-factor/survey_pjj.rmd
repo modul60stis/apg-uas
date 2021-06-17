@@ -1,0 +1,86 @@
+---
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Data berisi 6 variabel kuesioner survey mengenai PJJ.
+
+1.	Saya tidak memiliki kendala dalam mengakses internet.
+2.	Saya terbiasa mencari informasi dari internet.
+3.	Saya sudah tahu mengenai Google Classroom sebelumnya sehingga bermanfaat saat pelaksanaan PJJ.
+4.	Saya memiliki pengetahuan tentang Zoom, Google Meet ataupun layanan yang sejenis sebelumnya sehingga bermanfaat saat PJJ
+5.	Saya tidak masalah seandainya PJJ ini dilanjutkan.
+6.	Saya tidak masalah untuk tetap menggunakan Google Classroom untuk pelaksanaan PJJ.
+
+Lakukan analisis faktor pada data tersebut!
+
+```{r echo=FALSE}
+data = read.csv("survey_PJJ.csv")
+head(data)
+```
+
+Karena data hanya berjumlah 100, lalu dilakukan resampling menjadi 300 sebagai berikut
+```{r}
+set.seed(1)
+indeks_sampel <- sample(1:100, size=300, replace=TRUE)
+resample <- data[indeks_sampel,]
+```
+
+Lalu data hasil resampling distandarisasi
+```{r}
+strandarized_data = data.frame(scale(resample))
+```
+
+
+Hal yang pertama dilakukan yaitu uji kenormalan dan diperoleh hasil sebagai berikut
+```{r message=FALSE}
+library(MVN)
+result = mvn(strandarized_data)
+result
+```
+
+Diperoleh bahwa nilai $p-value < 0.5$ baik untuk yang univariate maupun yang multivariate, sehingga keputusannya adalah Tolak $H_0$ artinya data tidak berdistribusi normal. Namun, pada kasus ini, data diasumsikan berdistribusi normal.
+
+Lalu dilakukan uji Sphericity Bartlett menggunakan package `REdas` untuk menguji apakah terdapat korelasi yang signifikan antar variable penelitian.
+
+```{r message=FALSE}
+library(REdaS)
+bart_spher(strandarized_data)
+```
+
+Dari hasil di atas dapat dilihat bahwa $p-value < 0.05$ yang artinya tolak $H_0$ artinya tidak terdapat korelasi yang signifikan antar variabel penelitian.
+
+Selanjutnya dilakukan uji kecukupan sampel KMO
+```{r}
+KMOS(strandarized_data)
+```
+Hasil yang diperoleh nilai $KMO > 0.5$ yang berarti data memenuhi kriteria pengambilan sampel dan nilai MSA pada semua variabel bernilai $> 0.5$ yang berarti semua variabel termasuk dalam kelompok dan masuk dalam analisis faktor.
+
+Selanjutnya akan dilakukan analisis faktor. yang pertama kita lakukan adalah untuk mencari berapa faktor yang harus di ekstrak dengan melihat nilai $P-value$ nya
+```{r message=FALSE}
+library(psych)
+scree(cor(strandarized_data))
+```
+
+Hasil dari screeplot di atas menunjukkan jumlah factor yang harus kita ekstrak adalah 3. Lalu dilakukan faktor analisis dengan jumlah faktor 3 dan menggunakan rotasi varimax
+
+
+
+```{r}
+factanal(data, factors = 3, scores = "regression")
+```
+
+```{r}
+factanal(strandarized_data, factors = 3, scores = "regression", rotation = "varimax", method="mle")
+```
+
+Diperoleh pada nilai loadings nya
+
+- Faktor 1 didominasi oleh variabel X5 dan X6, sehingga faktor 1 merepresentasikan PJJ tetap dilaksanakan menggunakan Google Classroom.
+- Faktor 2 didominasi oleh variabel X1 dan X2, sehingga faktor 2 merepresentasikan mahasiswa sudah terbiasa mencari informasi di internet.
+- Faktor 3 didominasi oleh variabel X3 dan X4, sehingga faktor 3 merepresentasikan mahasiswa sudah memahami aplikasi pendukung PJJ.
