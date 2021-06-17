@@ -1,0 +1,415 @@
+---
+title: "Cluster Analysis"
+author: "Tim Modul 60"
+date: "6/17/2021"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(cluster)    
+library(factoextra) 
+library(dendextend)
+library(fpc)
+```
+
+Lakukan analisis cluster pada data `USArrests`
+
+# Persipakan Data
+
+## Bersihkan Data
+
+Hilangkan `na` pada data
+
+```{r}
+data("USArrests")
+df <- USArrests
+df <- na.omit(df)
+knitr::kable(head(df, 10))
+```
+
+## Melakukan Scaling Pada Data
+
+Hal ini penting dilakukan karena dalam melakukan analisis kluster akan dihitung jarak antara dua titik dibidang koordinat yang mungkin memiliki satuan yang berbeda. Jika tidak dilakukan scaling maka akan mungkin menghasilkan hasil yang tidak sesuai.
+
+Sebagai contoh misalnya terdapat 3 obervasi A(6km, 75kg), B(6km, 77kg), dan C(8km, 75kg). Misalnya dihitung menggunakan jarak euclidean diperoleh
+
+A-B = 2 unit
+A-C = 2 Unit
+
+Diperoleh dari A-B sama dengan A-C tapi pada realitasnya sangat berbeda. A-B tidak sama dengan A-C. Maka perlu dilakukan scaling terlebih dahulu sebelum dihitung jarak
+
+### Min-Max Normalization
+$$ 
+x_{i} = \frac{x_i - min(x)}{max(x) - min(x)}
+$$
+```{r}
+minmax <- function(x){(x-min(x))/(max(x)-min(x))}
+knitr::kable(head(minmax(df), 10))
+```
+
+
+### Standarisasi
+
+$$
+x_i = \frac{x_i - mean(x)}{sd(x)}
+$$
+Dapat dilakukan menggunakan fungsi `scale` bawaan R. Dalam analisis ini akan digunakan rumus yang ini
+
+```{r}
+df <- scale(df)
+knitr::kable(head(df, 10))
+```
+
+
+# Agglomerative Hierarchical Clustering
+
+## Menghitung Dissimilarity
+
+Nilai pada parameter method dapat berisi `euclidean`, `maximum`, `manhattan`, `canberra`, `binary` atau `minkowski`. Kali ini akan digunakan jarak euclidean
+
+```{r}
+d <- dist(df, method = "euclidean")
+```
+
+## Membuat Cluster
+
+Metode yang dapat digunakan adalah `complete`, `average`, `single`, `ward.D`, `median`, `centroid`. Kali ini akan digunakan Complete Linkage
+
+```{r}
+hc <- hclust(d, method = "complete" )
+hc
+```
+
+## Membuat Dendogram
+```{r}
+plot(hc, cex = 0.6, hang = -1)
+```
+
+Misalnya kita akan membaginya menjadi 4 cluster
+
+```{r}
+sub_grp <- cutree(hc, k =4)
+table(sub_grp)
+```
+
+Menyatukan hasil cluster dengan dataset awal
+
+```{r}
+res <-USArrests %>%
+            mutate(cluster = sub_grp)
+knitr::kable(head(res, 10))
+```
+
+
+Melihat Rata-rata tiap Cluster
+
+```{r}
+res %>% 
+      group_by(cluster) %>%
+      summarise_all(mean)
+```
+
+Dari hasil diatas dapat digunakan untuk melakukan cluster profiling. Dapat juga melihat statistik lainnya seperti median, quantile, min, max, dan lain-lain
+
+
+Mewarnai dendogram sesuai cluster
+
+```{r}
+plot(hc, cex = 0.6)
+rect.hclust(hc, k = 4, border = 2:5)
+```
+
+
+```{r}
+plot(color_branches(hc, h = 4))
+```
+
+Membuat Scatter Plot Data
+
+```{r message=FALSE, warning=FALSE}
+fviz_cluster(list(data = df, cluster = sub_grp))
+```
+
+
+# Divisive Hierarchical Clustering
+
+Method `diana` dapat digunakan untuk melakukan divisive clustering.
+
+```{r}
+d <- dist(df, method = "manhattan")
+hc2 <- diana(d)
+pltree(hc2, cex = 0.6, hang = -1, main = "Dendrogram of diana")
+```
+
+Mengambil 4 cluster
+
+```{r}
+sub_grp <- cutree(as.hclust(hc2), k = 4)
+fviz_cluster(list(data = df, cluster = sub_grp))
+```
+
+```{r}
+pltree(hc2, cex = 0.6, hang = -1, main = "Dendrogram of diana")
+rect.hclust(hc2, k = 4, border = 2:5)
+```
+
+# K-Means Clustering
+
+## Menentukan Jumlah Cluster
+
+### Elbow Method
+```{r}
+set.seed(1)
+fviz_nbclust(df, kmeans, method = "wss")
+```
+
+Dari gambar diatas 2 cluster bisa menjadi pilihan yang baik
+
+### Silhouette method
+```{r}
+set.seed(2723)
+fviz_nbclust(df, kmeans, method = "silhouette")
+```
+
+Metode Silhouette menyarankan menggunakan 2 cluster
+
+### Gap Statistil
+```{r message=FALSE, warning=FALSE}
+fviz_nbclust(df, kmeans, method = "gap_stat")
+```
+
+Metode gap statistik juga menyarankan menggunakan 2 cluster. Oleh karena itu kita akan menggunakan 2 cluster untuk analisis selanjutnya
+
+
+## Membentuk Cluster
+
+```{r}
+km <- eclust(df, "kmeans", k = 2, graph = FALSE)
+km
+```
+
+Kita bisa mengakses beberapa nilai seperti sum square within untuk tiap cluster dengan mengambil property `withinss`
+
+```{r}
+km$withinss
+```
+
+Kita juga dapat menggabung hasil cluster dengan data awal
+
+```{r}
+res <- USArrests %>%
+            mutate(cluster = km$cluster)
+knitr::kable(head(res, 10))
+```
+
+## Membuat Visualisasi Cluster
+
+```{r}
+fviz_cluster(km, geom = "point", ellipse.type = "norm", palette = "jco", ggtheme = theme_minimal())
+```
+
+
+```{r}
+fviz_cluster(km, palette = "jco", ggtheme = theme_minimal())
+```
+
+
+# Cluster Profiling
+
+**Contoh ini sama dengan modul pembelajaran.**
+
+Seorang peneliti ingin mengelompokkan kabupaten/kota di Jawa Timur berdasarkan indikator kesejahteraan sosial dan kemudian melakukan profiling dari klister yang terbentuk. Data yang dikumpulkan memiliki variable-variabel berikut:
+
+- Gini = gini ratio
+- Padat = kepadatan penduduk
+- AHH = Angka harapan hidup
+- AMH = angka melek huruf
+- P1 = Head count index
+- Petani = banyaknya petani
+- pdrb_kap = PDRB per kapita
+- status = status kesejahteraan kab/kota (1-sejahtera, 2-menengah, 3-kurang sejahtera)
+- pesisir = status wilayah pesisir (1-pesisir, 2-bukan pesisir)
+
+Maka lakukan analisis yg perlu dilakukan peneliti tersebut!
+
+
+
+## Memilih Variabel
+
+Peneliti ingin melakukan analisis pengelompokan berdasarkan indikator
+kesejahteraan social maka variable yg dipilih: Gini, AHH, AMH, dan P1 (dalam riil penelitian harus berdasarkan kajian teori).
+
+```{r}
+data <- read.csv("cluster_jatim.csv", row.names = 1)
+df <- data[,c(1,3,4,5)]
+df <- scale(df)
+knitr::kable(head(df, 10))
+```
+
+## Menentukan Jumlah Cluster
+ 
+Silahkan gunakan elbow method, sillhouette method atau gap statistik untuk menentukan jumlah klaster terbaik. Akan tetapi karena kita akan menjadikan variabel `status` menjadi Ground Truth maka kita pilih jumlah cluster sebanyak 3 sesuai dengan banyaknya status
+
+## Lakukan Clustering
+
+```{r}
+set.seed(1)
+km <- eclust(df, "kmeans", k = 3, nstart = 25, graph = FALSE)
+km
+```
+
+## Profiling
+
+### Internal
+
+```{r}
+fviz_cluster(km, 
+             geom = "point", 
+             ellipse.type = "norm", 
+             palette = "jco", 
+             ggtheme = theme_minimal())
+```
+
+```{r}
+data[,c(1,3,4,5)] %>%
+      mutate(cluster = km$cluster) %>%
+      group_by(cluster) %>%
+      summarise_all(mean)
+```
+
+Jika kita lihat dari cluster mean terlihat bahwa Cluster 1 adalah kabupaten/kota yang memiliki Gini ratio menengah, AHH menengah, dan AMH serta persentase penduduk miskin juga menengah, sehingga bisa kita katakan Cluster 1 adalah kabupaten/kota dengan tingkat
+kesejahteraan menengah. 
+
+Sedangkan Cluster 2 memiliki nilai Gini Ratio tinggi, AHH dan AMH
+tinggi sedangkan P1 rendah, artinya Cluster 2 adalah kabupaten/kota dengan tingkat kesejahteraan tinggi namun memiliki ketimpangan yang tinggi. 
+
+Sedangkan Cluster 3 adalah kabupaten/kota dengan tingkat kesejahteraan yang rendah.
+
+### External (Menggunakan variabel lain)
+
+Selain itu kita juga bisa membuat profil cluster dengan variable eksternal missal seperti berikut:
+
+```{r}
+data %>% 
+      select(Petani, Padat) %>%
+      mutate(cluster = as.character(km$cluster)) %>%
+      ggplot(aes(x = Petani, y = Padat, color = cluster)) +
+      geom_point() +
+      theme_minimal()
+```
+
+Terlihat bahwa cluster 2 umumnya adalah kelompok kabupaten/kota dengan kepadatan penduduk tinggi dan jumlah petani yang sedikit, sedangkan antara cluster 1 dan 3 relatif tidak berbeda.
+
+
+## Evaluasi Cluster
+
+### Visualisasi Sillhouette
+
+```{r}
+sil <- silhouette(km$cluster, dist(df))
+fviz_silhouette(sil)
+```
+
+Terlihat bahwa meski silhouette dibawah 0.5 namun semua observasinya memiliki silhouette positif (>0) sehingga meskipun klaster yang terbentuk relative belum cukup compact namun setidaknya penempatan semua observasi ke dalam cluster sudah tepat.
+
+
+```{r}
+knitr::kable(head(km$silinfo$widths,10))
+```
+
+Tabel diatas merupakan nilai silhouette untuk tiap observasi. Berikut nilai rat-rata untuk tiap cluster
+
+
+```{r}
+km$silinfo$clus.avg.widths
+```
+
+Rata-rata totalnya
+
+```{r}
+km$silinfo$avg.width
+```
+
+Untuk melihat nilai silhouette yang lebih kecil dari 0
+
+```{r}
+km$silinfo$widths %>%
+      filter(sil_width < 0)
+```
+
+Terlihat tidak ada yang bernilai negatif
+
+### Dunn Index
+```{r}
+km_stats <- cluster.stats(dist(df), km$cluster)
+km_stats$dunn
+```
+
+Dunn index digunakan untuk membandingkan beberapa parameter cluster yang berbeda, missal membandingkan untuk k = 2, k = 3 dan k = 4.
+
+Hasil dari `cluster.stats` juga sangat beragam. Berikut nilai yang dapat kita peroleh
+
+```{r}
+km_stats
+```
+
+### Validasi Eksternal
+
+Validasi eksternal dengan menggunakan ground truth variabel `status`
+
+1. Sejahtera
+2. Menengah
+3. Kurang sejahtera
+
+#### Sesuaikan Hasil Cluster
+Berdasarkan cluster profiling diperoleh bahwa cluster 1 adalah kabupaten menengah, cluster 2 sejahtera dan, cluster 3 kurang sejahtera.
+
+```{r}
+clus <- c()
+for (i in 1:length(km$cluster)){
+      if(km$cluster[i] == 1)
+            clus[i] <- 2
+      else if(km$cluster[i] == 2)
+            clus[i] <- 1
+      else
+            clus[i] <- 3
+}
+      
+clus
+```
+
+
+#### Corrected Rand index
+```{r}
+ground <- data$Status
+clust_stats <- cluster.stats(d = dist(df), ground, clus)
+clust_stats$corrected.rand
+```
+#### Tabel Kontigensi
+```{r}
+table(data$Status, clus)
+```
+
+Terlihat bahwa ternyata masih ada data yang tidak terkluster sesuai dengan varibel `Status`. Yang sesuai ada sebanyak 24 observasi, yaitu
+
+
+```{r}
+data %>%
+      mutate(cluster = clus,
+             kab = rownames(data)) %>%
+      select(kab, Status, cluster) %>%
+      filter(Status == cluster) %>%
+      knitr::kable()
+```
+
+Sedangkan yang tidak sesuai sebanyak 14 observasi
+```{r}
+data %>%
+      mutate(cluster = clus,
+             kab = rownames(data)) %>%
+      select(kab, Status, cluster) %>%
+      filter(Status != cluster) %>%
+      knitr::kable()
+```
+
