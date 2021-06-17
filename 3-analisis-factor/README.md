@@ -171,3 +171,155 @@ Diperoleh pada nilai loadings nya
 1. Faktor 1 didominasi oleh variabel X5 dan X6, sehingga faktor 1 merepresentasikan PJJ tetap dilaksanakan menggunakan Google Classroom.
 2. Faktor 2 didominasi oleh variabel X1 dan X2, sehingga faktor 2 merepresentasikan mahasiswa sudah terbiasa mencari informasi di internet.
 3. Faktor 3 didominasi oleh variabel X3 dan X4, sehingga faktor 3 merepresentasikan mahasiswa sudah memahami aplikasi pendukung PJJ.
+
+### Contoh 2
+
+File [SAQ](./SAQ8.sav) adalah file berisi data hasil survey Andy Field menggunakan SPSS Anxiety Questionnaire. SAQ-8 terdiri dari 8 pertanyaan berikut:
+
+1. Statistics makes me cry
+2. My friends will think I’m stupid for not being able to cope with SPSS
+3. Standard deviations excite me
+4. I dream that Pearson is attacking me with correlation coefficients
+5. I don’t understand statistics
+6. I have little experience of computers
+7. All computers hate me
+8. I have never been good at mathematics
+
+Hal yang pertama dilakukan yaitu uji kenormalan, disini dapat digunkana `mvn` untuk menguji kenormalan, baik uji multivariate normal maupun uji univariate nya. Diperoleh hasil sebagai berikut
+
+```r
+library(MVN)
+result = mvn(data)
+result
+```
+
+```
+$multivariateNormality
+             Test        Statistic p value Result
+1 Mardia Skewness  2562.5608289646       0     NO
+2 Mardia Kurtosis 27.5691604773384       0     NO
+3             MVN             <NA>    <NA>     NO
+
+$univariateNormality
+          Test  Variable Statistic   p value Normality
+1 Shapiro-Wilk    q01       0.8459  <0.001      NO    
+2 Shapiro-Wilk    q02       0.7212  <0.001      NO    
+3 Shapiro-Wilk    q03       0.9023  <0.001      NO    
+4 Shapiro-Wilk    q04       0.8886  <0.001      NO    
+5 Shapiro-Wilk    q05       0.8761  <0.001      NO    
+6 Shapiro-Wilk    q06       0.8368  <0.001      NO    
+7 Shapiro-Wilk    q07       0.9027  <0.001      NO    
+8 Shapiro-Wilk    q08       0.8085  <0.001      NO    
+
+$Descriptives
+       n     Mean   Std.Dev Median Min Max 25th 75th       Skew   Kurtosis
+q01 2571 2.374173 0.8280221      2   1   5    2    3 0.65456004  0.6055246
+q02 2571 1.623493 0.8510787      1   1   5    1    2 1.48767803  2.0367054
+q03 2571 2.585375 1.0750097      3   1   5    2    3 0.08940993 -0.7801429
+q04 2571 2.786075 0.9485482      3   1   5    2    3 0.38517992 -0.2878337
+q05 2571 2.722287 0.9646904      3   1   5    2    3 0.45564247 -0.4418064
+q06 2571 2.227149 1.1220023      2   1   5    1    3 0.92666201  0.1507951
+q07 2571 2.923765 1.1023600      3   1   5    2    4 0.19958846 -0.8510760
+q08 2571 2.236873 0.8725704      2   1   5    2    3 1.05050718  1.4833814
+```
+
+Diperoleh bahwa nilai `p−value<0` baik untuk yang univariate maupun yang multivariate, sehingga keputusannya adalah Tolak H0 artinya data tidak berdistribusi normal. Anda bisa melakukan normalisasi dengan metode yang anda ketahui, tapi contoh disini tidak dilakukan normalisasi
+
+Lalu dilakukan uji `Sphericity Bartlett` menggunakan package `REdas` untuk menguji apakah terdapat korelasi yang signifikan antar variable penelitian.
+
+```r
+library(REdaS)
+bart_spher(data)
+```
+
+```
+ Bartlett's Test of Sphericity
+
+Call: bart_spher(x = data)
+
+     X2 = 4157.283
+     df = 28
+p-value < 2.22e-16
+```
+
+Dari hasil di atas dapat dilihat bahwa `p−value<0.05` yang artinya tolak H0 artinya semua korelasi di luar diagonal utama adalah nol atau tidak terdapat korelasi signifikan antar variabel penelitian.
+
+Selanjutnya dilakukan uji kecukupan sampel KMO dan MSA
+
+```r
+KMOS(data)
+```
+
+```
+Kaiser-Meyer-Olkin Statistics
+
+Call: KMOS(x = data)
+
+Measures of Sampling Adequacy (MSA):
+      q01       q02       q03       q04       q05       q06       q07       q08 
+0.8386706 0.6762543 0.8178404 0.8480822 0.8686018 0.7534405 0.7801035 0.8817585 
+
+KMO-Criterion: 0.8176944
+```
+
+Hasil yang diperoleh nilai `KMO>0.5` yang berarti data memenuhi kriteria pengambilan sampel dan nilai `MSA>0.5` yang berarti semua variabel termasuk dalam kelompok dan masuk dalam analisis faktor.
+
+Selanjutnya akan dilakukan analisis faktor. yang pertama kita lakukan adalah untuk mencari berapa faktor yang harus di ekstrak dengan melihat nilai P−value nya
+
+```r
+sapply(1:4, function(f)
+  + round(factanal(data, factors = f, method = "mle")$PVAL, digits = 5))
+````
+
+```
+objective objective objective objective 
+  0.00000   0.00000   0.05467   0.50008
+```
+
+Untuk mencari jumlah faktor juga dapat dilakukan dengan menggunakan screeplot sebagai berikut
+
+```r
+library(psych)
+scree(cor(data))
+```
+
+![screeplot](./img/screeplot1.jpeg)
+
+Dari hasil uji untuk jumlah faktor yang digunakan, dari 1 hingga 4, dan juga pada screeplot, jumlah faktor yang harus di ekstrak adalah 3 karena nilai p value nya yang paling mendekati angka signifikan.
+
+Lalu kita melakukan faktor analisis untuk 3 faktor, dan diperoleh hasil sebagai berikut
+
+```r
+factanal(data, factors = 3, method = "mle")
+```
+
+```
+Call:
+factanal(x = data, factors = 3, method = "mle")
+
+Uniquenesses:
+  q01   q02   q03   q04   q05   q06   q07   q08 
+0.546 0.725 0.499 0.540 0.655 0.623 0.283 0.747 
+
+Loadings:
+    Factor1 Factor2 Factor3
+q01  0.652   0.122  -0.117 
+q02                  0.520 
+q03 -0.383  -0.202   0.560 
+q04  0.606   0.259  -0.159 
+q05  0.531   0.210  -0.135 
+q06  0.216   0.571         
+q07  0.287   0.769  -0.207 
+q08  0.457   0.203         
+
+               Factor1 Factor2 Factor3
+SS loadings      1.561   1.129   0.692
+Proportion Var   0.195   0.141   0.086
+Cumulative Var   0.195   0.336   0.423
+
+Test of the hypothesis that 3 factors are sufficient.
+The chi square statistic is 13.81 on 7 degrees of freedom.
+The p-value is 0.0547
+```
+
+Dari hasil analisis faktor tersebut diperoleh kesimpulan pada faktor pertama didominasi oleh `q01`, `q04`, dan `q05`, berdasarkan pertanyaan yang diberikan ketiga pertanyaan ini dapat diberi label *statistics anxiety*. Lalu pada faktor kedua, didominasi oleh `q06` dan `q07`, dan ini dapat diberi label *computer anxiety*. Lalu pada faktor ketiga, didominasi oleh `q02` dan `q03`.
