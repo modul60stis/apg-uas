@@ -176,6 +176,11 @@ Diperoleh pada nilai loadings nya
 
 File [SAQ](./SAQ8.sav) adalah file berisi data hasil survey Andy Field menggunakan SPSS Anxiety Questionnaire. SAQ-8 terdiri dari 8 pertanyaan berikut:
 
+```r
+library(haven)
+data = read_sav("SAQ8.sav")
+```
+
 1. Statistics makes me cry
 2. My friends will think I’m stupid for not being able to cope with SPSS
 3. Standard deviations excite me
