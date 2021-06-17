@@ -1,0 +1,174 @@
+---
+title: "Diskriminan Analysis"
+author: "Tim Modul 60"
+date: "6/18/2021"
+output: 
+      md_document:
+          variant: markdown_github
+---
+
+```{r message=FALSE, warning=FALSE}
+library(MASS)
+library(tidyverse)
+library(caret)
+library(MVN)
+library("biotools")
+```
+
+# Contoh I
+
+## Bagi Data
+```{r}
+data("iris")
+set.seed(123)
+training.samples <- iris$Species %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train.data <- iris[training.samples, ]
+test.data <- iris[-training.samples, ]
+```
+
+## Buat Model
+
+```{r}
+model <- lda(Species~ Sepal.Length + Sepal.Width, data = train.data)
+model
+```
+
+## Lakukan Prediksi
+```{r}
+predictions <- model %>% predict(test.data)
+predictions$class
+```
+
+## Akurasi 
+```{r}
+mean(predictions$class==test.data$Species)
+```
+
+# Contoh II
+
+## Import Data
+```{r}
+pot <- read.csv("pottery2.csv")
+knitr::kable(head(pot, 10))
+```
+
+## Rubah Target Data jadi Factor
+```{r}
+pot$kiln <- as.factor(pot$kiln)
+summary(pot)
+```
+
+
+## Uji Untuk Melihat Perbedaan
+```{r}
+mnv <- manova(cbind(Al2O3,Fe2O3,MgO,CaO,Na2O,K2O,TiO2,MnO,BaO)~kiln, data=pot)
+summary(mnv)
+```
+
+Terligat bahwa tolak $H_0$ sehingga ada perbedaan yang signifikan
+
+## Uji Asumsi
+
+### Uji Homogenitas
+
+- H0 : ∑1=∑2=∑3
+- H1 : Minimal ada satu yang berbeda
+
+```{r}
+boxM(pot[, -length(pot)], pot[, length(pot)])
+```
+
+Tidak memenuhi
+
+### Uji Normalitas
+
+```{r}
+mvn(pot[, -length(pot)])
+```
+
+Terlihat dat tidak semuanya berdistribusi normal.
+Tapi yah seperti biasa kita akan tetap menganggapnya normal
+
+## Buat Model
+```{r}
+set.seed(2723)
+
+k <- length(levels(pot$kiln))
+n <- nrow(pot)
+
+idx <- sample(1:n, 36)
+pot.tr <- pot[idx,] #data training
+pot.ts <- pot[-idx,] #data testing
+
+fit<-lda(kiln~.,data=pot.tr)
+fit
+```
+
+Dari hasil diatas bisa dilihat prior yang digunakan, koefisien diskriminannya dan juga proporsi of trace untuk setiap diskriminan yang dibuat
+
+## Scores
+```{r}
+zscore <- predict(fit,pot[,-10])
+knitr::kable(head(zscore$x, 10))
+```
+
+## Korelasi
+
+korelasi antara var original dengan discriminant score
+
+```{r}
+kor1 <- t(cor(zscore$x[,1],pot[,-10]))
+kor2 <- t(cor(zscore$x[,2],pot[,-10]))
+tabkor<-data.frame(kor1,kor2)
+tabkor
+```
+
+## Lakukan Prediksi
+```{r}
+pred <- predict(fit,pot.ts[,-10])
+pred
+```
+
+
+```{r}
+ct <- table(pot.ts$kiln, pred$class)
+ct
+```
+
+Terlihat bahwa model berhasil mengklasifikasikan semua data dengan benar
+
+```{r}
+sum(diag(prop.table(ct)))
+```
+
+```{r}
+lda.data <- cbind(pot.tr, predict(fit)$x)
+
+ggplot(lda.data, aes(LD1, LD2)) +
+      geom_point(aes(color = as.factor(kiln))) +
+      theme_minimal()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
